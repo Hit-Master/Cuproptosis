@@ -49,9 +49,3 @@ fwrite(brown_matrix, file = 'seurat_object/matrix/brown_matrix.txt', sep = '\t')
 fwrite(lightcyan_matrix, file = 'seurat_object/matrix/lightcyan_matrix.txt', sep = '\t')
 fwrite(turquoise_matrix, file = 'seurat_object/matrix/turquoise_matrix.txt', sep = '\t')
 fwrite(prob, file = 'seurat_object/matrix/prob.txt', sep = '\t')
-
-
-
-
-
-
