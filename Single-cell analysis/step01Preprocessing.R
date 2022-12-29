@@ -46,17 +46,17 @@ use_colors <- c(
   p033 = "#9C964A",
   p034 = "#FD6467")
 
-samples <- read_excel("./metadata/patients_metadata.xlsx", range = cell_cols("A:A")) %>% .$sample_id
+samples <- read_excel("../data/metadata/patients_metadata.xlsx", range = cell_cols("A:A")) %>% .$sample_id
 
 for (i in seq_along(samples)){
-  assign(paste0("scs_data", i), Read10X(data.dir = paste0("./cellranger/", samples[i], "/filtered_feature_bc_matrix")))
+  assign(paste0("scs_data", i), Read10X(data.dir = paste0("../data/cellranger/", samples[i], "/filtered_feature_bc_matrix")))
 }
 
 for (i in seq_along(samples)){
   assign(paste0("seu_obj", i), CreateSeuratObject(counts = eval(parse(text = paste0("scs_data", i))), project = samples[i], min.cells = 3))
 }
 
-seu_obj <- merge(seu_obj15, y = c(seu_obj16, seu_obj17, seu_obj18, seu_obj19, seu_obj20), add.cell.ids = samples[15:20], project = "lung")
+seu_obj <- merge(seu_obj1, y = c(seu_obj2, seu_obj3, seu_obj4, seu_obj5, seu_obj6, seu_obj7, seu_obj8, seu_obj9, seu_obj10, seu_obj11, seu_obj12, seu_obj13, seu_obj14, seu_obj15, seu_obj16, seu_obj17, seu_obj18, seu_obj19, seu_obj20), add.cell.ids = samples, project = "lung")
 
 seu_obj <- PercentageFeatureSet(seu_obj, pattern = "^MT-", col.name = "pMT")
 seu_obj <- PercentageFeatureSet(seu_obj, pattern = "^HBA|^HBB", col.name = "pHB")
@@ -69,8 +69,51 @@ for (i in seq_along(qcparams)){
 for (i in seq_along(qcparams)){
   print(RidgePlot(object = seu_obj, features = qcparams[i], group.by = "orig.ident"))
 }
+
 VlnPlot(seu_obj, features = c("nFeature_RNA", "nCount_RNA", "pMT"), pt.size = 0, group.by = "orig.ident", ncol = 1, log = T)
-ggsave2("QC.pdf", path = "./result_3v3/", width = 20, height = 20, units = "cm")
+ggsave2("Vln.pdf", path = "../results", width = 30, height = 20, units = "cm")
+
+remove(seu_obj1)
+remove(seu_obj2)
+remove(seu_obj3)
+remove(seu_obj4)
+remove(seu_obj5)
+remove(seu_obj6)
+remove(seu_obj7)
+remove(seu_obj8)
+remove(seu_obj9)
+remove(seu_obj10)
+remove(seu_obj11)
+remove(seu_obj12)
+remove(seu_obj13)
+remove(seu_obj14)
+remove(seu_obj15)
+remove(seu_obj16)
+remove(seu_obj17)
+remove(seu_obj18)
+remove(seu_obj19)
+remove(seu_obj20)
+
+remove(scs_data1)
+remove(scs_data2)
+remove(scs_data3)
+remove(scs_data4)
+remove(scs_data5)
+remove(scs_data6)
+remove(scs_data7)
+remove(scs_data8)
+remove(scs_data9)
+remove(scs_data10)
+remove(scs_data11)
+remove(scs_data12)
+remove(scs_data13)
+remove(scs_data14)
+remove(scs_data15)
+remove(scs_data16)
+remove(scs_data17)
+remove(scs_data18)
+remove(scs_data19)
+remove(scs_data20)
 
 qc_std_plot_helper <- function(x) x + 
   scale_color_viridis() +
@@ -79,7 +122,7 @@ qc_std_plot_helper <- function(x) x +
 qc_std_plot <- function(seu_obj) {
   qc_data <- as_tibble(FetchData(seu_obj, c("nCount_RNA", "nFeature_RNA", "pMT", "pHB", "pRP")))
   plot_grid(
-
+    
     qc_std_plot_helper(ggplot(qc_data, aes(log2(nCount_RNA), log2(nFeature_RNA), color = pMT))) + 
       geom_hline(yintercept = log2(nFeature_lower), color = "red", linetype = 2) +
       geom_hline(yintercept = log2(nFeature_upper), color = "red", linetype = 2) +
@@ -95,7 +138,7 @@ qc_std_plot <- function(seu_obj) {
       geom_hline(yintercept = log2(nFeature_upper), color = "red", linetype = 2) +
       geom_vline(xintercept = log2(nCount_lower), color = "red", linetype = 2) +
       geom_vline(xintercept = log2(nCount_upper), color = "red", linetype = 2),
-
+    
     qc_std_plot_helper(ggplot(qc_data, aes(log2(nCount_RNA), pMT, color = nFeature_RNA))) + 
       geom_hline(yintercept = pMT_lower, color = "red", linetype = 2) +
       geom_hline(yintercept = pMT_upper, color = "red", linetype = 2) +
@@ -109,8 +152,8 @@ qc_std_plot <- function(seu_obj) {
     qc_std_plot_helper(ggplot(qc_data, aes(log2(nCount_RNA), pRP, color = nFeature_RNA))) + 
       geom_vline(xintercept = log2(nCount_lower), color = "red", linetype = 2) +
       geom_vline(xintercept = log2(nCount_upper), color = "red", linetype = 2),
-
-
+    
+    
     qc_std_plot_helper(ggplot(qc_data, aes(log2(nFeature_RNA), pMT, color = nCount_RNA))) + 
       geom_hline(yintercept = pMT_lower, color = "red", linetype = 2) +
       geom_hline(yintercept = pMT_upper, color = "red", linetype = 2) +
@@ -124,34 +167,36 @@ qc_std_plot <- function(seu_obj) {
     qc_std_plot_helper(ggplot(qc_data, aes(log2(nFeature_RNA), pRP, color = nCount_RNA))) + 
       geom_vline(xintercept = log2(nFeature_lower), color = "red", linetype = 2) +
       geom_vline(xintercept = log2(nFeature_upper), color = "red", linetype = 2),
-
+    
     qc_std_plot_helper(ggplot(qc_data, aes(pRP, pMT, color = nCount_RNA))) + 
       geom_hline(yintercept = pMT_lower, color = "red", linetype = 2) +
       geom_hline(yintercept = pMT_upper, color = "red", linetype = 2),
     qc_std_plot_helper(ggplot(qc_data, aes(pRP, pMT, color = nFeature_RNA))) + 
       geom_hline(yintercept = pMT_lower, color = "red", linetype = 2) +
       geom_hline(yintercept = pMT_upper, color = "red", linetype = 2),
-
-
+    
+    
     ggplot(gather(qc_data, key, value), aes(key, value)) +
       geom_violin() +
       facet_wrap(~key, scales = "free", ncol = 5),
-
+    
     ncol = 3, align = "hv"
   )
 }
+
+## Before filtering
+
 seu_obj_unfiltered <- seu_obj
+
 qc_std_plot(seu_obj_unfiltered)
 
-ggsave2("before_filtering.pdf", path = "./result_3v3/", width = 30, height = 30, units = "cm")
+## After filtering
 
 seu_obj <- subset(seu_obj_unfiltered, subset = nFeature_RNA > nFeature_lower & nFeature_RNA < nFeature_upper & nCount_RNA > nCount_lower & nCount_RNA < nCount_upper & pMT < pMT_upper & pHB < pHB_upper)
 
 qc_std_plot(seu_obj)
-ggsave2("after_filtering.pdf", path = "./result_3v3/", width = 30, height = 30, units = "cm")
 
 seu_obj_unfiltered
 seu_obj
 
 seu_obj <- SCTransform(seu_obj, verbose = T, vars.to.regress = c("nCount_RNA", "pMT"), conserve.memory = T)
-saveRDS(seu_obj, file = "scRNA_SCTransform.RDS")
