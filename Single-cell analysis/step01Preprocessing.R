@@ -8,7 +8,6 @@ library(ggplot2)
 library(viridis)
 library(tidyr)
 
-# 设定阈值
 nFeature_lower <- 500
 nFeature_upper <- 10000
 nCount_lower <- 1000
@@ -20,7 +19,6 @@ pHB_upper <- 5
 
 theme_set(theme_cowplot())
 
-# 设定配色
 use_colors <- c(
   Tumor = "brown2",
   Normal = "deepskyblue2",
@@ -43,22 +41,14 @@ use_colors <- c(
   p033 = "#9C964A",
   p034 = "#FD6467")
 
-
-# 加载数据和质量控制
-
-# 样本列表,利用read_excel
 sample_list <- read_excel("data/metadata/patients_metadata.xlsx", range = cell_cols("A:A")) %>% .$sample_id
 
-# 批量载入标准的cellranger文件
-# 创建seurat对象
 sc_list1 <- CreateSeuratObject(counts = Read10X(data.dir = paste0("data/cellranger/", sample_list[1], "/filtered_feature_bc_matrix")), project = sample_list[1], min.cells = 3, min.features = 200)
 sc_list2 <- lapply(sample_list[-1], function(sample_id){ 
   CreateSeuratObject(counts = Read10X(data.dir = paste0("data/cellranger/", sample_id, "/filtered_feature_bc_matrix")), 
                      project = sample_id, min.cells = 3, min.features = 200)
 })
 
-
-# merge一键融合
 seu_obj <- merge(sc_list1, y = sc_list2, add.cell.ids = sample_list, project = "lung")
 
 rm(sc_list1)
@@ -77,15 +67,12 @@ for (i in seq_along(qcparams)){
   print(RidgePlot(object = seu_obj, features = qcparams[i], group.by = "orig.ident"))
 }
 
-# 批量看计算结果,很不错
 VlnPlot(seu_obj, features = c("nFeature_RNA", "nCount_RNA", "pMT"), pt.size = 0, group.by = "orig.ident", ncol = 1, log = T)
 ggsave2("VlnPlot.pdf", path = "figure/Preprocessing/QC/", width = 20, height = 20, units = "cm")
 
 RidgePlot(object = seu_obj, features = c("nFeature_RNA", "nCount_RNA", "pMT"), group.by = "orig.ident", ncol = 1, log = T)
 ggsave2("RidgePlot.pdf", path = "figure/Preprocessing/QC/", width = 20, height = 20, units = "cm")
 
-
-# 过滤
 qc_std_plot_helper <- function(x) x + 
   scale_color_viridis() +
   geom_point(size = 0.01, alpha = 0.3)
@@ -166,7 +153,6 @@ seu_obj <- subset(seu_obj_unfiltered, subset = nFeature_RNA > nFeature_lower & n
 qc_std_plot(seu_obj)
 ggsave2("after_filtering.pdf", path = "figure/Preprocessing/QC/", width = 30, height = 30, units = "cm")
 
-# 查看过滤数目
 seu_obj_unfiltered
 seu_obj
 
