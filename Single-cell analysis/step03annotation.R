@@ -1,84 +1,72 @@
+rm(list = ls())
+
 library(Seurat)
-library(dplyr)
-library(reticulate)
-library(sctransform)
-library(cowplot)
-library(ggplot2)
-library(viridis)
-library(tidyr)
-library(magrittr)
-library(reshape2)
 library(readxl)
-library(readr)
-library(stringr)
-library(progeny)
-library(scales)
+library(ggplot2)
+library(dplyr)
 
-theme_set(theme_cowplot())
+seu_obj <- readRDS('seurat_object/preprocessing/scRNA_main_annotated.RDS')
+metatable <- read_excel("data/metadata/patients_metadata.xlsx")
 
-use_colors <- c(
-  Tumor = "brown2",
-  Normal = "deepskyblue2",
-  G1 = "#46ACC8",
-  G2M = "#E58601",
-  S = "#B40F20",
-  Epithelial = "seagreen",
-  Immune = "darkgoldenrod2",
-  Stromal = "steelblue",
-  p018 = "#E2D200",
-  p019 = "#46ACC8",
-  p023 = "#E58601",
-  p024 = "#B40F20",
-  p027 = "#0B775E",
-  p028 = "#E1BD6D",
-  p029 = "#35274A",
-  p030 = "#F2300F",
-  p031 = "#7294D4",
-  p032 = "#5B1A18",
-  p033 = "#9C964A",
-  p034 = "#FD6467")
+metadata <- FetchData(seu_obj, "orig.ident")
+metadata$cell_id <- rownames(metadata)
+metadata$sample_id <- metadata$orig.ident
+metadata <- left_join(x = metadata, y = metatable, by = "sample_id")
+rownames(metadata) <- metadata$cell_id
 
-epi <- readRDS("seurat_objects/epi.RDS")
-imm <- readRDS("seurat_objects/imm.RDS")
-str <- readRDS("seurat_objects/str.RDS")
+seu_obj <- AddMetaData(seu_obj, metadata = metadata)
 
-### epithelial subclustering
-epi <- RunPCA(epi)
-ElbowPlot(epi,  ndims = 50)
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
 
-epi <- RunUMAP(epi, dims = 1:20)
-epi <- FindNeighbors(epi, dims = 1:20)
-for (i in c(0.2, 0.3, 0.4, 0.5, 1, 2)) {
-  epi <- FindClusters(epi, resolution = i)
-  print(DimPlot(epi, reduction = "umap", label = T) + labs(title = paste0("resolution: ", i)))
+score_cc <- function(seu_obj) {
+  seu_obj <- CellCycleScoring(seu_obj, s.genes, g2m.genes)
+  seu_obj@meta.data$CC.Diff <- seu_obj@meta.data$S.Score - seu_obj@meta.data$G2M.Score
+  return(seu_obj)
 }
 
-Idents(epi) <- epi@meta.data$SCT_snn_res.1
+seu_obj <- score_cc(seu_obj)
 
+FeatureScatter(seu_obj, "G2M.Score", "S.Score", group.by = "Phase", pt.size = .1) +
+  coord_fixed(ratio = 1)
+ggsave2("Cell Cycle Scoring.pdf", path = "figure/Preprocessing/QC/", width=7 ,height=6)
+DimPlot(seu_obj, group.by = "Phase" ,reduction = "umap")
+ggsave2("Cell Cycle.pdf", path = "figure/Preprocessing/QC/", width=7 ,height=6)
 
-### immune subclustering
-imm <- RunPCA(imm)
-ElbowPlot(imm,  ndims = 50)
+saveRDS(seu_obj, file = "seurat_object/Preprocessing/all.RDS")
 
-imm <- RunUMAP(imm, dims = 1:20)
-imm <- FindNeighbors(imm, dims = 1:20)
-for (i in c(0.2, 0.3, 0.4, 0.5, 1, 2)) {
-  imm <- FindClusters(imm, resolution = i)
-  print(DimPlot(imm, reduction = "umap") + labs(title = paste0("resolution: ", i)))
-}
+Idents(seu_obj) <- seu_obj@meta.data$main_cell_type
+epi <- subset(seu_obj, idents = "Epithelial")
+imm <- subset(seu_obj, idents = "Immune")
+str <- subset(seu_obj, idents = "Stromal")
 
-Idents(imm) <- imm@meta.data$SCT_snn_res.0.5
+epi <- ScaleData(epi)
+imm <- ScaleData(imm)
+str <- ScaleData(str)
 
+saveRDS(epi, file = "seurat_object/Preprocessing/epi.RDS")
+saveRDS(imm, file = "seurat_object/Preprocessing/imm.RDS")
+saveRDS(str, file = "seurat_object/Preprocessing/str.RDS")
 
-### stromal sublustering
-str <- RunPCA(str)
-ElbowPlot(str, ndims = 50)
+DimPlot(seu_obj, group.by = "tissue_type", cols = use_colors, pt.size = 0.1)
+ggsave2("Tissue type.png", path = "figure/Preprocessing/", width=7 ,height=6)
 
-str <- RunUMAP(str, dims = 1:20)
-str <- FindNeighbors(str, dims = 1:20)
-for (i in c(0.2, 0.3, 0.4, 0.5, 1, 2)) {
-  str <- FindClusters(str, resolution = i)
-  print(DimPlot(str, reduction = "umap") + labs(title = paste0("resolution: ", i)))
-}
+DimPlot(seu_obj, group.by = "patient_id", cols = use_colors, pt.size = 0.1)
+ggsave2("Patient.png", path = "figure/Preprocessing/",  width=7 ,height=6)
 
-Idents(str) <- str@meta.data$SCT_snn_res.1
+DimPlot(seu_obj, group.by = "main_cell_type", cols = use_colors, pt.size = 0.1)
+ggsave2("Cell type.png", path = "figure/Preprocessing/",  width=7 ,height=6)
+
+cell_types <- FetchData(seu_obj, vars = c("sample_id", "main_cell_type", "tissue_type")) %>% 
+  mutate(main_cell_type = factor(main_cell_type, levels = c("Stromal", "Immune", "Epithelial"))) %>% 
+  mutate(sample_id = factor(sample_id, levels = rev(c("p018t", "p019t", "p023t", "p024t", "p027t", "p028t", "p030t", "p031t", "p032t", "p033t", "p034t", "p018n", "p019n", "p027n", "p028n", "p029n", "p030n", "p031n", "p032n", "p033n", "p034n"))))
+
+ggplot(data = cell_types) + 
+  geom_bar(mapping = aes(x = sample_id, fill = main_cell_type, ), position = "fill", width = 0.75) +
+  scale_fill_manual(values = use_colors) +
+  coord_flip() + guides(fill=F) + 
+  theme_bw() + 
+  theme(panel.grid.major = element_blank()) +
+  facet_grid(tissue_type~., scales="free_y", space="free_y")
+ggsave2("Cell distribution.pdf", path = "figure/Preprocessing/", width=5 ,height=5)
+
