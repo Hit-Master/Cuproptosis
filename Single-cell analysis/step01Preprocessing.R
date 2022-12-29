@@ -1,12 +1,17 @@
-rm(list = ls())
-
 library(Seurat)
 library(dplyr)
-library(readxl)
+library(reticulate)
+library(sctransform)
 library(cowplot)
 library(ggplot2)
 library(viridis)
 library(tidyr)
+library(magrittr)
+library(reshape2)
+library(readxl)
+library(progeny)
+library(readr)
+library(stringr)
 
 nFeature_lower <- 500
 nFeature_upper <- 10000
@@ -41,37 +46,31 @@ use_colors <- c(
   p033 = "#9C964A",
   p034 = "#FD6467")
 
-sample_list <- read_excel("data/metadata/patients_metadata.xlsx", range = cell_cols("A:A")) %>% .$sample_id
+samples <- read_excel("./metadata/patients_metadata.xlsx", range = cell_cols("A:A")) %>% .$sample_id
 
-sc_list1 <- CreateSeuratObject(counts = Read10X(data.dir = paste0("data/cellranger/", sample_list[1], "/filtered_feature_bc_matrix")), project = sample_list[1], min.cells = 3, min.features = 200)
-sc_list2 <- lapply(sample_list[-1], function(sample_id){ 
-  CreateSeuratObject(counts = Read10X(data.dir = paste0("data/cellranger/", sample_id, "/filtered_feature_bc_matrix")), 
-                     project = sample_id, min.cells = 3, min.features = 200)
-})
+for (i in seq_along(samples)){
+  assign(paste0("scs_data", i), Read10X(data.dir = paste0("./cellranger/", samples[i], "/filtered_feature_bc_matrix")))
+}
 
-seu_obj <- merge(sc_list1, y = sc_list2, add.cell.ids = sample_list, project = "lung")
+for (i in seq_along(samples)){
+  assign(paste0("seu_obj", i), CreateSeuratObject(counts = eval(parse(text = paste0("scs_data", i))), project = samples[i], min.cells = 3))
+}
 
-rm(sc_list1)
-rm(sc_list2)
+seu_obj <- merge(seu_obj15, y = c(seu_obj16, seu_obj17, seu_obj18, seu_obj19, seu_obj20), add.cell.ids = samples[15:20], project = "lung")
 
 seu_obj <- PercentageFeatureSet(seu_obj, pattern = "^MT-", col.name = "pMT")
 seu_obj <- PercentageFeatureSet(seu_obj, pattern = "^HBA|^HBB", col.name = "pHB")
 seu_obj <- PercentageFeatureSet(seu_obj, pattern = "^RPS|^RPL", col.name = "pRP")
 
 qcparams <- c("nFeature_RNA", "nCount_RNA", "pMT", "pHB", "pRP")
-
 for (i in seq_along(qcparams)){
   print(VlnPlot(object = seu_obj, features = qcparams[i], group.by = "orig.ident", pt.size = 0))
 }
 for (i in seq_along(qcparams)){
   print(RidgePlot(object = seu_obj, features = qcparams[i], group.by = "orig.ident"))
 }
-
 VlnPlot(seu_obj, features = c("nFeature_RNA", "nCount_RNA", "pMT"), pt.size = 0, group.by = "orig.ident", ncol = 1, log = T)
-ggsave2("VlnPlot.pdf", path = "figure/Preprocessing/QC/", width = 20, height = 20, units = "cm")
-
-RidgePlot(object = seu_obj, features = c("nFeature_RNA", "nCount_RNA", "pMT"), group.by = "orig.ident", ncol = 1, log = T)
-ggsave2("RidgePlot.pdf", path = "figure/Preprocessing/QC/", width = 20, height = 20, units = "cm")
+ggsave2("QC.pdf", path = "./result_3v3/", width = 20, height = 20, units = "cm")
 
 qc_std_plot_helper <- function(x) x + 
   scale_color_viridis() +
@@ -80,7 +79,7 @@ qc_std_plot_helper <- function(x) x +
 qc_std_plot <- function(seu_obj) {
   qc_data <- as_tibble(FetchData(seu_obj, c("nCount_RNA", "nFeature_RNA", "pMT", "pHB", "pRP")))
   plot_grid(
-    
+
     qc_std_plot_helper(ggplot(qc_data, aes(log2(nCount_RNA), log2(nFeature_RNA), color = pMT))) + 
       geom_hline(yintercept = log2(nFeature_lower), color = "red", linetype = 2) +
       geom_hline(yintercept = log2(nFeature_upper), color = "red", linetype = 2) +
@@ -96,7 +95,7 @@ qc_std_plot <- function(seu_obj) {
       geom_hline(yintercept = log2(nFeature_upper), color = "red", linetype = 2) +
       geom_vline(xintercept = log2(nCount_lower), color = "red", linetype = 2) +
       geom_vline(xintercept = log2(nCount_upper), color = "red", linetype = 2),
-    
+
     qc_std_plot_helper(ggplot(qc_data, aes(log2(nCount_RNA), pMT, color = nFeature_RNA))) + 
       geom_hline(yintercept = pMT_lower, color = "red", linetype = 2) +
       geom_hline(yintercept = pMT_upper, color = "red", linetype = 2) +
@@ -110,8 +109,8 @@ qc_std_plot <- function(seu_obj) {
     qc_std_plot_helper(ggplot(qc_data, aes(log2(nCount_RNA), pRP, color = nFeature_RNA))) + 
       geom_vline(xintercept = log2(nCount_lower), color = "red", linetype = 2) +
       geom_vline(xintercept = log2(nCount_upper), color = "red", linetype = 2),
-    
-    
+
+
     qc_std_plot_helper(ggplot(qc_data, aes(log2(nFeature_RNA), pMT, color = nCount_RNA))) + 
       geom_hline(yintercept = pMT_lower, color = "red", linetype = 2) +
       geom_hline(yintercept = pMT_upper, color = "red", linetype = 2) +
@@ -125,37 +124,34 @@ qc_std_plot <- function(seu_obj) {
     qc_std_plot_helper(ggplot(qc_data, aes(log2(nFeature_RNA), pRP, color = nCount_RNA))) + 
       geom_vline(xintercept = log2(nFeature_lower), color = "red", linetype = 2) +
       geom_vline(xintercept = log2(nFeature_upper), color = "red", linetype = 2),
-    
+
     qc_std_plot_helper(ggplot(qc_data, aes(pRP, pMT, color = nCount_RNA))) + 
       geom_hline(yintercept = pMT_lower, color = "red", linetype = 2) +
       geom_hline(yintercept = pMT_upper, color = "red", linetype = 2),
     qc_std_plot_helper(ggplot(qc_data, aes(pRP, pMT, color = nFeature_RNA))) + 
       geom_hline(yintercept = pMT_lower, color = "red", linetype = 2) +
       geom_hline(yintercept = pMT_upper, color = "red", linetype = 2),
-    
-    
+
+
     ggplot(gather(qc_data, key, value), aes(key, value)) +
       geom_violin() +
       facet_wrap(~key, scales = "free", ncol = 5),
-    
+
     ncol = 3, align = "hv"
   )
 }
-
-
-# Before filtering
 seu_obj_unfiltered <- seu_obj
 qc_std_plot(seu_obj_unfiltered)
-ggsave2("before_filtering.pdf", path = "figure/Preprocessing/QC/", width = 30, height = 30, units = "cm")
 
-# After filtering
+ggsave2("before_filtering.pdf", path = "./result_3v3/", width = 30, height = 30, units = "cm")
+
 seu_obj <- subset(seu_obj_unfiltered, subset = nFeature_RNA > nFeature_lower & nFeature_RNA < nFeature_upper & nCount_RNA > nCount_lower & nCount_RNA < nCount_upper & pMT < pMT_upper & pHB < pHB_upper)
+
 qc_std_plot(seu_obj)
-ggsave2("after_filtering.pdf", path = "figure/Preprocessing/QC/", width = 30, height = 30, units = "cm")
+ggsave2("after_filtering.pdf", path = "./result_3v3/", width = 30, height = 30, units = "cm")
 
 seu_obj_unfiltered
 seu_obj
 
-# Data normalization
 seu_obj <- SCTransform(seu_obj, verbose = T, vars.to.regress = c("nCount_RNA", "pMT"), conserve.memory = T)
-# saveRDS(seu_obj, file = "seurat_object/Preprocessing/SCTransform.RDS")
+saveRDS(seu_obj, file = "scRNA_SCTransform.RDS")
