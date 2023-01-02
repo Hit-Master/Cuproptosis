@@ -4,4 +4,4 @@ Lung adenocarcinoma (LUAD) is a primary lung malignant tumor. Cuproptosis, a rec
 ![Overview](https://github.com/Hit-Master/Cuproptosis/blob/main/Figure/Figure%201.png)
 
 ## Code Source
-Folders contain data and code.
+Folders contain code and data.
